@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#083f35">
+  <meta name="description" content="候補カードから最悪配札と最悪応手を読み切る、大富豪の終盤パズル。">
+  <title>詰み大富豪</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23083f35'/%3E%3Cpath d='M32 11 19 29h9l-9 14h10v10h6V43h10l-9-14h9z' fill='%23f5ead1'/%3E%3Ccircle cx='48' cy='16' r='8' fill='%23de4a3f'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="./styles.css">
+  <script src="./problems.js" defer></script>
+  <script src="./app.js" defer></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="#" aria-label="詰み大富豪 ホーム">
+      <span class="brand-mark">♠</span>
+      <span>詰み大富豪</span>
+      <small>TSUMI DAIFUGO</small>
+    </a>
+    <nav class="view-switch" aria-label="表示切り替え">
+      <button class="nav-btn active" data-view="play">対局</button>
+      <button class="nav-btn" data-view="library">問題集</button>
+      <button class="nav-btn" data-view="edit">問題設定</button>
+      <button class="nav-btn" data-view="rules">ルール</button>
+    </nav>
+    <button class="ghost-btn" id="newPuzzleBtn">問題を作る</button>
+  </header>
+
+  <main>
+    <section id="playView" class="view active" aria-label="対局">
+      <div class="play-grid">
+        <aside class="brief-panel">
+          <div id="puzzleEyebrow" class="eyebrow">PUZZLE 001 · 終盤</div>
+          <h1>全配札を<br><em>読み切れ。</em></h1>
+          <p class="lead">候補から成立するすべての配札と、相手の最悪応手を越えて、最初に上がれ。</p>
+          <div class="rule-chips" aria-label="採用ルール">
+            <span>革命</span><span>8切り</span><span>スペ3返し</span><span>縛り</span><span>反則上がり</span>
+          </div>
+          <dl class="puzzle-stats">
+            <div><dt>成立する配札</dt><dd id="dealCount">—</dd></div>
+            <div><dt>探索局面</dt><dd id="nodeCount">—</dd></div>
+            <div><dt>安全な初手</dt><dd id="safeCount">—</dd></div>
+          </dl>
+          <button id="analyzeBtn" class="primary-btn">最悪手を読む</button>
+          <p class="microcopy">候補カードの一部は、誰にも配られない場合があります。</p>
+        </aside>
+
+        <section class="table-wrap" aria-label="カードテーブル">
+          <div class="table" id="gameTable">
+            <div class="table-shine"></div>
+            <div id="opponents" class="opponents" aria-label="相手プレイヤー"></div>
+
+            <div class="field" aria-live="polite">
+              <div class="field-meta">
+                <span id="turnBadge" class="turn-badge">あなたの番</span>
+                <span id="fieldState">場は空です</span>
+              </div>
+              <div id="fieldCards" class="field-cards">
+                <span class="empty-field">LEAD</span>
+              </div>
+              <div id="lastMove" class="last-move">好きな組み合わせから開始</div>
+            </div>
+
+            <div class="player-zone">
+              <div class="player-line">
+                <div><span class="you-label">YOU</span><strong>あなたの手札</strong></div>
+                <span id="selectionHint">カードを選択</span>
+              </div>
+              <div id="myHand" class="hand" aria-label="あなたの手札"></div>
+              <div class="play-actions">
+                <button id="resetSelectBtn" class="secondary-btn">選択解除</button>
+                <button id="passBtn" class="secondary-btn">パス</button>
+                <button id="playBtn" class="action-btn" disabled>この手を出す</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <aside class="analysis-panel">
+          <div class="panel-head">
+            <div>
+              <span class="eyebrow">FORCED LINE</span>
+              <h2>読み筋</h2>
+            </div>
+            <span id="verdict" class="verdict idle">未解析</span>
+          </div>
+          <div id="analysisMessage" class="analysis-message">
+            <span class="analysis-icon">?</span>
+            <div><strong>まだ盤面を読んでいません</strong><p>「最悪手を読む」で、全候補配札を横断して探索します。</p></div>
+          </div>
+          <div id="challengeTools" class="challenge-tools" hidden>
+            <div class="challenge-meta">
+              <span id="challengeProblem">—</span>
+              <span id="challengeAttempt">挑戦 1回目</span>
+            </div>
+            <div id="hintPanel" class="hint-panel"><b>ヒントは3段階</b><p>型 → 安全手の数 → 初手1つ、の順に開きます。</p></div>
+            <div class="challenge-actions">
+              <button id="hintBtn" class="secondary-btn">ヒントを見る</button>
+              <button id="revealBtn" class="secondary-btn danger-ghost">解答を見る</button>
+            </div>
+          </div>
+          <ol id="lineLog" class="line-log"></ol>
+          <div class="candidate-box">
+            <div class="candidate-head"><span>相手札の候補</span><span id="candidateMeta">—</span></div>
+            <div id="candidateCards" class="mini-cards"></div>
+          </div>
+          <button id="restartBtn" class="wide-ghost">この問題を最初から</button>
+          <div id="challengeNav" class="challenge-nav" hidden>
+            <button id="backLibraryBtn" class="secondary-btn">問題集へ</button>
+            <button id="prevProblemBtn" class="secondary-btn">← 前の問題</button>
+            <button id="nextProblemBtn" class="secondary-btn">次の問題 →</button>
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    <section id="libraryView" class="view library-view" aria-label="問題集">
+      <div class="library-shell">
+        <header class="library-header">
+          <div>
+            <span class="eyebrow">PATTERN LAB · 32 PUZZLES</span>
+            <h2>詰み筋を、型で読む。</h2>
+            <p>同じ原理を4つの盤面で比較する問題集。全候補配札を探索し、成立する筋と崩れる条件を並べて観察できます。</p>
+          </div>
+          <div class="audit-card">
+            <div class="audit-score"><strong id="auditPassed">0</strong><span>/ 32 問</span></div>
+            <div class="audit-meter"><span id="auditMeter"></span></div>
+            <p id="auditStatus">未検証</p>
+            <button id="auditBtn" class="primary-btn">32問を一括検証</button>
+            <div class="clear-progress">
+              <span>あなたのクリア</span><b id="clearCount">0 / 32</b>
+            </div>
+            <button id="randomChallengeBtn" class="wide-ghost compact">未クリアから1問</button>
+          </div>
+        </header>
+
+        <div class="lab-toolbar">
+          <div id="patternFilters" class="pattern-filters" role="group" aria-label="詰み筋の絞り込み"></div>
+          <label class="difficulty-filter">難易度
+            <select id="difficultyFilter"><option value="all">すべて</option><option value="入門">入門</option><option value="基礎">基礎</option><option value="応用">応用</option></select>
+          </label>
+        </div>
+
+        <section id="patternStudy" class="pattern-study" aria-label="詰み筋パターン"></section>
+
+        <div class="library-section-head">
+          <div><span class="eyebrow">PUZZLE INDEX</span><h3 id="libraryTitle">全32問</h3></div>
+          <span id="visibleProblemCount">32問を表示</span>
+        </div>
+        <section id="puzzleGrid" class="puzzle-grid" aria-live="polite"></section>
+      </div>
+    </section>
+
+    <section id="editView" class="view editor-view" aria-label="問題設定">
+      <div class="editor-heading">
+        <div><span class="eyebrow">PUZZLE MAKER</span><h2>終盤を切り取る</h2></div>
+        <p>あなたの手札、相手の枚数、相手札の候補を指定します。候補数は相手の合計枚数以上にしてください。</p>
+      </div>
+      <div class="editor-grid">
+        <section class="editor-card">
+          <div class="step-num">01</div><h3>人数と残り枚数</h3>
+          <label for="opponentCount">相手の人数</label>
+          <select id="opponentCount"><option value="1">1人</option><option value="2" selected>2人</option><option value="3">3人</option></select>
+          <div id="opponentInputs" class="count-inputs"></div>
+          <p class="field-note">デモの厳密探索は相手札合計8枚までを推奨します。</p>
+        </section>
+        <section class="editor-card card-editor">
+          <div class="step-num">02</div><h3>カードを選ぶ</h3>
+          <div class="target-switch" role="group" aria-label="追加先">
+            <button class="target-btn active" data-target="mine">自分の手札</button>
+            <button class="target-btn" data-target="candidates">相手札候補</button>
+          </div>
+          <div id="deckPicker" class="deck-picker" aria-label="カード選択"></div>
+        </section>
+        <section class="editor-card summary-card">
+          <div class="step-num">03</div><h3>局面を確認</h3>
+          <div class="summary-row"><span>自分</span><div id="editMine" class="mini-cards"></div></div>
+          <div class="summary-row"><span>候補</span><div id="editCandidates" class="mini-cards"></div></div>
+          <div id="validationMessage" class="validation-message">入力を確認しています</div>
+          <button id="applyPuzzleBtn" class="primary-btn">この局面で始める</button>
+        </section>
+      </div>
+    </section>
+
+    <section id="rulesView" class="view rules-view" aria-label="ルール">
+      <div class="rules-hero">
+        <span class="eyebrow">RULESET · FEDERATION BASED</span>
+        <h2>曖昧さを、<br>先に決めておく。</h2>
+        <p>日本大富豪連盟の競技ルールを基準に、終盤の詰み判定に必要な部分を採用しています。</p>
+      </div>
+      <div class="rules-list">
+        <article><b>01</b><h3>勝利条件</h3><p>どの成立配札・どの相手応手でも、他のプレイヤーより先に反則なく手札を0枚にできれば「詰みあり」です。</p></article>
+        <article><b>02</b><h3>基本の強さ</h3><p>3から2の順に強く、ジョーカーは最強。場と同じ型・枚数で、より強い組み合わせを出します。</p></article>
+        <article><b>03</b><h3>5大ルール</h3><p>革命、8切り、スペ3返し、スート縛り、反則上がりを採用。階段は同一スート3枚以上です。</p></article>
+        <article><b>04</b><h3>パス</h3><p>一度パスすると場が流れるまで復帰できません。全員がパスすると最後に出した人が次の先手です。</p></article>
+        <article><b>05</b><h3>不確定な相手札</h3><p>候補から人数ごとの枚数を満たす全配札を列挙。観測できた出し札・パスで可能性を絞ります。</p></article>
+        <article><b>06</b><h3>デモの境界</h3><p>小さな終盤向けのβ版です。ジョーカーを絡めた縛り判定は保守的に扱い、探索上限を超えた局面は未確定とします。</p></article>
+      </div>
+    </section>
+  </main>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+</body>
+</html>
+
